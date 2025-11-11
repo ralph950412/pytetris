@@ -46,35 +46,56 @@ def gameover():
 # Moving
 boardclone = cp.deepcopy(board)
 
+def recordtotalcells():
+    cellcount = 0
+    for row in boardclone:
+        for cell in row:
+            if cell == 1:
+                cellcount += 1
+    return cellcount
+
 # If the displacement is not valid, correct it until it is
-# TODO: Handle tetromino stacking.
-# The idea is to refactor fixdisplacement() to detect the total '1's on the board.
-# If the number changes after a movement, fix the displacement or spawn the next tetromino.
-def fixdisplacement():
+# Handle tetromino stacking
+# TODO: Perhaps this could use some improvements
+def fixdisplacement(arg: str):
     global dy
     global dx
+    should_spawn_next = 0
+
+    def check():
+        y = int(cell[0] + dy)
+        x = int(cell[1] + dx)
+        if 0 <= y <= 39 and 0 <= x <= 9:
+            if boardclone[y][x] == 1:
+                overlapped = True
+            else:
+                overlapped = False
+        else:
+            overlapped = False
+        return (y, x, overlapped)
 
     for cell in tetromino:
-        if xmin + dx < 0:
+        check()
+        if arg in ['right', 'auto'] and (check()[1] < 0 or check()[2]):
             dx += 1
-            fixdisplacement()
-        elif xmax + dx > 9:
+            fixdisplacement(arg)
+        elif arg in ['left', 'auto'] and (check()[1] > 9 or check()[2]):
             dx -= 1
-            fixdisplacement()
-        elif ymax + dy < 20:
+            fixdisplacement(arg)
+        elif arg in ['down', 'auto'] and (check()[0] < 0 or check()[2]):
             dy += 1
-            fixdisplacement()
-        elif ymax + dy > 39:
-            while ymax + dy > 39:
+            fixdisplacement(arg)
+        elif arg in ['up', 'auto'] and (check()[0] > 39 or check()[2]):
+            while check()[0] > 39 or check()[2]:
                 dy -= 1
-            spawn_next()
+            if arg == 'up':
+                should_spawn_next += 1
         else:
-            break
+            continue
+    if should_spawn_next > 0:
+        return 'spawn_next'
 
 def updatepiece(arg: int):
-    # Make sure the displacement is valid
-    fixdisplacement()
-
     for cell in tetromino:
         y = int(cell[0] + dy)
         x = int(cell[1] + dx)
@@ -138,44 +159,51 @@ while not game_status == 'game_over':
     if keyboard.is_pressed('left'):
         updatepiece(0)
         dx -= 1
+        fixdisplacement('right')
         updatepiece(1)
         updateboard()
     # Move right
     if keyboard.is_pressed('right'):
         updatepiece(0)
         dx += 1
+        fixdisplacement('left')
         updatepiece(1)
         updateboard()
     # Soft drop
     if keyboard.is_pressed('down'):
-        if not ymax + dy >= 39:
-            updatepiece(0)
+        updatepiece(0)
         dy += 1
+        spawn_condition = fixdisplacement('up')
         updatepiece(1)
         updateboard()
-     # Hard drop
+        if spawn_condition == 'spawn_next':
+            spawn_next()
+    # Hard drop
     if keyboard.is_pressed('space'):
         updatepiece(0)
-        dy = 19 - ymax
-        updatepiece(1)
-        dy += 1
+        dy = 39 - ymax
+        fixdisplacement('up')
         updatepiece(1)
         updateboard()
+        spawn_next()
     # Clockwise rotation
     if keyboard.is_pressed('x') or keyboard.is_pressed('up'):
         updatepiece(0)
         rotatepiece('CR')
+        fixdisplacement('auto')
         updatepiece(1)
         updateboard()
     # Counter-clockwise rotation
     if keyboard.is_pressed('z'):
         updatepiece(0)
         rotatepiece('CCR')
+        fixdisplacement('auto')
         updatepiece(1)
         updateboard()
     # 180-degree rotation
     if keyboard.is_pressed('a'):
         updatepiece(0)
         rotatepiece('180R')
+        fixdisplacement('auto')
         updatepiece(1)
         updateboard()

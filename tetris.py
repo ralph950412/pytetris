@@ -7,42 +7,49 @@ import time
 
 # Let's use a 2-dimensional list for the board.
 
-# TODO: In the future, the board will be 10 x 40;
-# the top 20 rows will be hidden from the UI.
+# TODO: Make use of pygame
 
 # Start the game
 game_status = 'game_active'
 
 # Initialize board
-board = [[0 for i in range(10)] for j in range(20)]
+board = [[0 for i in range(10)] for j in range(40)]
 
 # Tetromino (y, x)
 tetrominoes = {
-    'I': [[(1, 0), (1, 1), (1, 2), (1, 3)], [(0, 2), (1, 2), (2, 2), (3, 2)]],
-    'L': [[(2, 0), (1, 0), (1, 1), (1, 2)]],
-    'J': [[(1, 0), (1, 1), (1, 2), (2, 2)]],
-    'T': [[(0, 0), (0, 1), (0, 2), (1, 1)]],
-    'O': [[(-0.5, -0.5), (-0.5, 0.5), (0.5, -0.5), (0.5, 0.5)]],
-    'S': [[(1, 0), (1, 1), (0, 1), (0, 2)]],
-    'Z': [[(0, 0), (0, 1), (1, 1), (1, 2)]]
+    'I': [(0.5, -1.5), (0.5, -0.5), (0.5, 0.5), (0.5, 1.5)],
+    'L': [(1, -1), (0, -1), (0, 0), (0, 1)],
+    'J': [(0, -1), (0, 0), (0, 1), (1, 1)],
+    'T': [(0, -1), (0, 0), (0, 1), (1, 0)],
+    'O': [(-0.5, -0.5), (-0.5, 0.5), (0.5, -0.5), (0.5, 0.5)],
+    'S': [(0, -1), (0, 0), (-1, 0), (-1, 1)],
+    'Z': [(-1, -1), (-1, 0), (0, 0), (0, 1)]
 }
 
-# Select a shape and orientation (0, 1, 2, 3)
-# TODO: Switch to randomizing orientation with rotatepiece()
+# Select a shape and orientation
 def select_tetrominoes():
     global shape
     global tetromino
     global ymin, xmin, ymax, xmax
     shape = random.choice(list(tetrominoes))
-    orientation = random.choice([i for i in range(len(tetrominoes[shape]))])
-    tetromino = tetrominoes[shape][orientation]
+    tetromino = tetrominoes[shape]
     ymin, xmin = min([i[0] for i in tetromino]), min([i[1] for i in tetromino])
     ymax, xmax = max([i[0] for i in tetromino]), max([i[1] for i in tetromino])
+    orientation = random.choice(['NONE', 'CR', 'CCR', '180R'])
+    rotatepiece(orientation)
+
+# TODO: Handle Game Over (1/2)
+def gameover():
+    global game_status
+    game_status = 'game_over'
 
 # Moving
 boardclone = cp.deepcopy(board)
 
 # If the displacement is not valid, correct it until it is
+# TODO: Handle tetromino stacking.
+# The idea is to refactor fixdisplacement() to detect the total '1's on the board.
+# If the number changes after a movement, fix the displacement or spawn the next tetromino.
 def fixdisplacement():
     global dy
     global dx
@@ -54,12 +61,11 @@ def fixdisplacement():
         elif xmax + dx > 9:
             dx -= 1
             fixdisplacement()
-        elif ymax + dy < 0:
+        elif ymax + dy < 20:
             dy += 1
             fixdisplacement()
-            gameover()
-        elif ymax + dy > 19:
-            while ymax + dy > 19:
+        elif ymax + dy > 39:
+            while ymax + dy > 39:
                 dy -= 1
             spawn_next()
         else:
@@ -91,32 +97,33 @@ def rotatepiece(type):
         for cell in tetromino:
             y, x = -cell[0], -cell[1]
             tetromino_rotated.append(tuple([y, x]))
+    if type == 'NONE':
+        tetromino_rotated = tetromino
     tetromino = tetromino_rotated
     ymin, xmin = min([i[0] for i in tetromino]), min([i[1] for i in tetromino])
     ymax, xmax = max([i[0] for i in tetromino]), max([i[1] for i in tetromino])
 
 def updateboard():
     # Microsoft Windows compatibility
-    if os.name == 'nt':
-        os.system('cls')
-    else:
-        os.system('clear')
+    os.system('cls') if os.name == 'nt' else os.system('clear')
     board = cp.deepcopy(boardclone)
-    for row in board:
+    for row in board[20:]:
         print(row)
     print(f'Pivot (y, x): ({dy}, {dx})') ##DEBUG
     print(f'Tetromino (y, x): {tetromino}') ##DEBUG
+    print(f'dy: {dy}') ##DEBUG
     print(f'ymax + dy: {ymax + dy}') ##DEBUG
+    print(f'ymin + dy: {ymin + dy}') ##DEBUG
     time.sleep(0.075)
 
 # Spawn the tetrominoes
+# TODO: Handle Game Over (1/2)
+# End the game if the spawn gets obstructed
 def spawn_next():
     global dy, dx
     select_tetrominoes()
-    if shape == 'O':
-        dy, dx = 0.5, 4.5
-    else:
-        dy, dx = 0, 4
+    dy = 20 - ymin
+    dx = 4.5 if shape in ['I', 'O'] else 4
     updatepiece(1)
     updateboard()
 
@@ -124,11 +131,6 @@ spawn_next()
 
 # TODO: Gravity
 # Perhaps we should create a separate thread for that
-
-# Handle Game Over
-def gameover():
-    global game_status
-    game_status = 'game_over'
 
 # Controls
 while not game_status == 'game_over':
@@ -146,7 +148,7 @@ while not game_status == 'game_over':
         updateboard()
     # Soft drop
     if keyboard.is_pressed('down'):
-        if not ymax + dy >= 19:
+        if not ymax + dy >= 39:
             updatepiece(0)
         dy += 1
         updatepiece(1)
